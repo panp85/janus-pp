@@ -3505,7 +3505,6 @@ static gboolean janus_ice_outgoing_transport_wide_cc_feedback(gpointer user_data
 				for(i = stream->transport_wide_cc_last_feedback_seq_num+1; i<transport_seq_num; ++i) {
 					/* Create new stat */
 					janus_rtcp_transport_wide_cc_stats *missing = g_malloc(sizeof(janus_rtcp_transport_wide_cc_stats));
-					
 					/* Add missing packet */
 					missing->transport_seq_num = i;
 					missing->timestamp = 0;

@@ -916,6 +916,10 @@ int janus_process_incoming_request(janus_request *request) {
 	const gchar *transaction_text = json_string_value(transaction);
 	json_t *message = json_object_get(root, "janus");
 	const gchar *message_text = json_string_value(message);
+	if(!strcasecmp(message_text, "p2p")) {
+		p2p_process(request, root);
+		return 0;
+	}
 
 	if(session_id == 0 && handle_id == 0) {
 		/* Can only be a 'Create new session', a 'Get info' or a 'Ping/Pong' request */
