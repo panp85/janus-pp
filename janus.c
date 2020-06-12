@@ -557,6 +557,7 @@ static void janus_ice_handle_dereference(janus_ice_handle *handle) {
 
 static void janus_session_free(const janus_refcount *session_ref) {
 	janus_session *session = janus_refcount_containerof(session_ref, janus_session, ref);
+	p2p_free(session->session_id);
 	/* This session can be destroyed, free all the resources */
 	if(session->ice_handles != NULL) {
 		g_hash_table_destroy(session->ice_handles);
@@ -566,6 +567,7 @@ static void janus_session_free(const janus_refcount *session_ref) {
 		janus_request_destroy(session->source);
 		session->source = NULL;
 	}
+	
 	g_free(session);
 }
 
