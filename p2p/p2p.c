@@ -39,6 +39,7 @@ typedef struct room_one(
 
 typedef struct peer_one{
 	janus_session *session;
+	janus_request *request;
 	
 } peer_one;
 
@@ -108,6 +109,7 @@ peer_one* new_peer(janus_request *request, json_t *root){
 
 	peer_one *peer = (peer_one*)g_malloc(sizeof(peer_one));;
 	peer.session = session;
+	peer.request = request;
 	//peer_one *peer = 
 	//janus_session *session = g_hash_table_lookup(sessions, &session_id);
 	return peer;
@@ -148,6 +150,7 @@ void message_process(janus_request *request, json_t *root, peer_on *peer){
 	const gchar *command_text = json_string_value(command);
 
 	if(!strcasecmp(command_text, "offer")) {
+		
 	}
 	else if(!strcasecmp(command_text, "answer")){
 	} 
@@ -201,7 +204,7 @@ void p2p_proces(janus_request *request, json_t *root) {
 		
 		json_object_set_new(reply, "data", data);
 		/* Send the success reply */
-		ret = janus_process_success(request, reply);
+		int ret = janus_process_success(request, reply);
 }
 
 void p2p_free(guint64 session_id){
@@ -220,11 +223,23 @@ void p2p_free(guint64 session_id){
 			g_hash_table_iter_init(iter_peer, room->peers);
 			while(g_hash_table_iter_next(&iter_peer, NULL, &value_peer)){
 				peer_one* peer_ = (peer_one *)value_peer;
-				if(peer_ != peer){
-					json_t *reply = janus_create_message("success", peer->session->session_id, transaction_text);
+				if(peer_ != peer){//todo 多对多
+					json_t *reply = janus_create_message("hangup", 0, NULL);
+					//json_object_set_new(reply, "data", data);
+					int ret = janus_process_success(peer_->request, reply);
 				}
 			}
 		}
 	}
+}
+
+int isp2p(json_t *root){
+	json_t *p2p = json_object_get(root, "p2p");
+	int  = 0;
+	//const gchar *transaction_text = json_string_value(transaction);
+	if(p2p) {
+		return 1;
+	}
+	return 0;
 }
 
