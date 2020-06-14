@@ -166,6 +166,33 @@ int p2p_message_process(janus_request *request, json_t *root){
 				peer = new_peer(request, root);
 				peer->room_id = g_strdup(r);
 				g_hash_table_insert(room_ins->peers, janus_uint64_dup(sid), peer);
+								
+				GHashTableIter iter_peer;
+				gpointer value_peer;
+				g_hash_table_iter_init(iter_peer, room_ins->peers);
+				char new_peer[4096] = {0};
+				int len = 0;
+				while(g_hash_table_iter_next(&iter_peer, NULL, &value_peer)){
+					peer_one* peer_ = (peer_one *)value_peer;
+					if(peer_ != peer){//todo 多对多，暂时只支持1对1的
+						memcpy(new_peer+len, peer_->session->session_id, strlen(peer_->session->session_id));
+						len += strlen(peer_->session->session_id);
+						new_peer[len] = ',';
+						len += 1;
+
+						json_t *reply = janus_create_message("_new_peer", 0, NULL);
+						json_t *data = json_object();
+						json_object_set_new(data, "socketId", peer->session->session_id);
+						json_t *json_object_set_new(reply, "data", data);
+						int ret = janus_process_success(peer_->request, reply);
+					}
+				}
+				json_t *reply = janus_create_message("_peers", 0, NULL);
+				json_t *data = json_object();
+				json_object_set_new(data, "connections", new_peer);
+				json_object_set_new(reply, "data", data);
+				//json_object_set_new(reply, "data", data);
+				int ret = janus_process_success(peer->request, reply);
 			}
 		}
 		else{
@@ -175,6 +202,7 @@ int p2p_message_process(janus_request *request, json_t *root){
 			g_hash_table_insert(room_ins->peers, janus_uint64_dup(sid), peer);
 			g_hash_table_insert(p2p_rooms, g_strdup(r), room_ins);
 		}
+			
 	}
 	else if(!strcasecmp(command_text, "destroy")) {
 		p2p_free(sid);
@@ -184,7 +212,7 @@ int p2p_message_process(janus_request *request, json_t *root){
 	} 
 	else if(!strcasecmp(command_text, "message")){
 		json_t *jsep = json_object_get(root, "jsep");
-		json_t *sdp = json_object_get(root, "sdp");
+		//json_t *sdp = json_object_get(root, "sdp");
 	 	
 		room_one* room = find_room(sid);
 		peer_one* peer = g_hash_table_lookup(room->peers, session_id);
@@ -197,11 +225,6 @@ int p2p_message_process(janus_request *request, json_t *root){
 			peer_one* peer_ = (peer_one *)value_peer;
 			if(peer_ != peer){//todo 多对多，暂时只支持1对1的
 				json_t *reply = janus_create_message("event", 0, NULL);
-				
-				json_t *jsep_send = json_object();
-				//json_object_set_new(reply, "plugindata", json_integer(session_id));
-				//json_object_set_new(jsep_send, "sdp", sdp);
-				//json_object_set_new(jsep_send, "type", "offer");
 				json_object_set_new(reply, "jsep", jsep);
 				//json_object_set_new(reply, "data", data);
 				int ret = janus_process_success(peer_->request, reply);
