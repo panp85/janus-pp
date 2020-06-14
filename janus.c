@@ -1080,13 +1080,18 @@ int janus_process_incoming_request(janus_request *request) {
 		janus_refcount_increase(&handle->ref);
 		/* Attach to the plugin */
 		int error = 0;
-		if((error = janus_ice_handle_attach_plugin(session, handle, plugin_t)) != 0) {
+		if((!isp2p(root) && error = janus_ice_handle_attach_plugin(session, handle, plugin_t)) != 0) {
 			/* TODO Make error struct to pass verbose information */
 			janus_session_handles_remove(session, handle);
 			JANUS_LOG(LOG_ERR, "Couldn't attach to plugin '%s', error '%d'\n", plugin_text, error);
 			ret = janus_process_error(request, session_id, transaction_text, JANUS_ERROR_PLUGIN_ATTACH, "Couldn't attach to plugin: error '%d'", error);
 			goto jsondone;
 		}
+		
+		if(isp2p(root)){
+			p2p_message_process(request, root);
+		}
+		
 		/* Prepare JSON reply */
 		json_t *reply = janus_create_message("success", session_id, transaction_text);
 		json_t *data = json_object();
@@ -1109,7 +1114,9 @@ int janus_process_incoming_request(janus_request *request) {
 		}
 		/* Schedule the session for deletion */
 		janus_session_destroy(session);
-
+		if(isp2p(root)){
+			p2p_message_process(request, root);
+		}
 		/* Prepare JSON reply */
 		json_t *reply = janus_create_message("success", session_id, transaction_text);
 		/* Send the success reply */
@@ -1148,6 +1155,9 @@ int janus_process_incoming_request(janus_request *request) {
 			ret = janus_process_error(request, session_id, transaction_text, JANUS_ERROR_PLUGIN_DETACH, "No plugin attached");
 			goto jsondone;
 		}
+		if(isp2p(root)){
+			p2p_message_process(request, root);
+		}
 		janus_ice_webrtc_hangup(handle, "Janus API");
 		/* Prepare JSON reply */
 		json_t *reply = janus_create_message("success", session_id, transaction_text);
@@ -1175,6 +1185,10 @@ int janus_process_incoming_request(janus_request *request) {
 		/* Send the success reply */
 		ret = janus_process_success(request, reply);
 	} else if(!strcasecmp(message_text, "message")) {
+		if((isp2p(root)){
+			p2p_message_process(request, root);
+			return 0;
+		}
 		if(handle == NULL) {
 			/* Query is an handle-level command */
 			ret = janus_process_error(request, session_id, transaction_text, JANUS_ERROR_INVALID_REQUEST_PATH, "Unhandled request '%s' at this path", message_text);
@@ -1199,6 +1213,7 @@ int janus_process_incoming_request(janus_request *request) {
 		char *jsep_type = NULL;
 		char *jsep_sdp = NULL, *jsep_sdp_stripped = NULL;
 		gboolean renegotiation = FALSE;
+		
 		if(jsep != NULL) {
 			if(!json_is_object(jsep)) {
 				ret = janus_process_error(request, session_id, transaction_text, JANUS_ERROR_INVALID_JSON_OBJECT, "Invalid jsep object");
@@ -1511,6 +1526,10 @@ int janus_process_incoming_request(janus_request *request) {
 		}
 		janus_plugin_result_destroy(result);
 	} else if(!strcasecmp(message_text, "trickle")) {
+		if(isp2p(root)){
+			p2p_message_process(request, root);
+			return 0;
+		}
 		if(handle == NULL) {
 			/* Trickle is an handle-level command */
 			ret = janus_process_error(request, session_id, transaction_text, JANUS_ERROR_INVALID_REQUEST_PATH, "Unhandled request '%s' at this path", message_text);

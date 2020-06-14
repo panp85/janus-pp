@@ -93,12 +93,16 @@ room_one *room_create(guint64 session_id) {
 
 peer_one* new_peer(janus_request *request, json_t *root){
 	guint64 session_id;
+	json_t *session_id = json_object_get(root, "session_id");
+	const guint64 sid = json_integer_value(session_id);
 
-	janus_session *session = janus_session_create(session_id);
+	//janus_session *session = janus_session_create(session_id);
+	janus_session *session = janus_session_find(sid);
 	if(session == NULL) {
-		janus_process_error(request, session_id, transaction_text, JANUS_ERROR_UNKNOWN, "Memory error");
-		return;
+		janus_process_error(request, sid, 0, JANUS_ERROR_UNKNOWN, "no session");
+		return NULL;
 	}
+	#if 0
 	//session_id = session->session_id;
 	/* We increase the counter as this request is using the session */
 	janus_refcount_increase(&session->ref);
@@ -106,58 +110,110 @@ peer_one* new_peer(janus_request *request, json_t *root){
 	session->source = janus_request_new(request->transport, request->instance, NULL, FALSE, NULL);
 	/* Notify the source that a new session has been created */
 	request->transport->session_created(request->instance, session->session_id);
-
+	#endif
 	peer_one *peer = (peer_one*)g_malloc(sizeof(peer_one));;
 	peer.session = session;
 	peer.request = request;
-	//peer_one *peer = 
-	//janus_session *session = g_hash_table_lookup(sessions, &session_id);
 	return peer;
 }
 
 room_one* new_room(janus_request *request, json_t *root, char *room_id){
-	//guint64 key = 0;
 	room_one* room = (room_one*)g_malloc(sizeof(room_one));
-	/*
-	while(key == 0) {
-		key = janus_random_uint64();
-		room_one* r = g_hash_table_lookup(p2p_rooms, &key);
-		if(r != NULL) {
-			key = 0;
-		}
-	}
 	
-	room->key = key;
-	*/
 	char *key = g_strdup(room_id);
 	g_hash_table_insert(p2p_rooms, key, room);
 
-	room->peers = //g_hash_table_new_full(g_str_hash, g_str_equal, (GDestroyNotify)g_free, (GDestroyNotify)free_peer);
+	room->peers =
 		g_hash_table_new_full(g_int64_hash, g_int64_equal, (GDestroyNotify)g_free,  (GDestroyNotify)free_peer);
 
 	return room;
 }
 
-void message_process(janus_request *request, json_t *root, peer_on *peer){
-/*
-	json_t *session_id = json_object_get(root, "session_id");
-	const char *sid = json_string_value(session_id);
-	janus_session *session;
-	
-	session = janus_session_find(session_id);
-*/
-	json_t *command = json_object_get(root, "command");
+int p2p_message_process(janus_request *request, json_t *root){
+	init();
+
+	json_t *command = json_object_get(root, "janus");
 	const gchar *command_text = json_string_value(command);
 
-	if(!strcasecmp(command_text, "offer")) {
-		
-	}
-	else if(!strcasecmp(command_text, "answer")){
-	} 
-	else if(!strcasecmp(command_text, "ice_candidate")){
-	} 
-}
+	json_t *transaction = json_object_get(root, "transaction");
+	const gchar *transaction_text = json_string_value(transaction);
 
+	json_t *session_id = json_object_get(root, "session_id");
+	const guint64 sid = json_integer_value(session_id);
+	
+	if(!strcasecmp(command_text, "attach")) {
+		JANUS_LOG(LOG_ERR, "p2p attach.\n");
+		json_t *room = json_object_get(root, "room");
+		if(!room){
+			JANUS_LOG(LOG_ERR, "no room in json.\n");
+			janus_process_error(request, 0, transaction_text, 1000, "no room in json");
+			return -1;
+		}
+		const char *r = json_string_value(room);
+		
+		peer_one* peer;
+		room_one *room_ins = g_hash_table_lookup(p2p_rooms, r);
+		
+		if(room_ins){//
+			if(sid){
+				peer = g_hash_table_lookup(room_ins->peers, sid);
+				if(peer){
+					janus_process_error(request, sid, transaction_text, 1000, "session_id already ok");
+					return -1;
+				}
+			}
+			else{
+				peer = new_peer(request, root);
+				peer->room_id = g_strdup(r);
+				g_hash_table_insert(room_ins->peers, janus_uint64_dup(sid), peer);
+			}
+		}
+		else{
+			room_ins = new_room(request, root, r);
+			peer = new_peer(request, root);
+			peer->root_id = g_strdup(r);
+			g_hash_table_insert(room_ins->peers, janus_uint64_dup(sid), peer);
+			g_hash_table_insert(p2p_rooms, g_strdup(r), room_ins);
+		}
+	}
+	else if(!strcasecmp(command_text, "destroy")) {
+		p2p_free(sid);
+	}
+	else if(!strcasecmp(command_text, "hangup")){
+		p2p_free(sid);
+	} 
+	else if(!strcasecmp(command_text, "message")){
+		json_t *jsep = json_object_get(root, "jsep");
+		json_t *sdp = json_object_get(root, "sdp");
+	 	
+		room_one* room = find_room(sid);
+		peer_one* peer = g_hash_table_lookup(room->peers, session_id);
+
+		//发sdp给对方peer
+		GHashTableIter iter_peer;
+		gpointer value_peer;
+		g_hash_table_iter_init(iter_peer, room->peers);
+		while(g_hash_table_iter_next(&iter_peer, NULL, &value_peer)){
+			peer_one* peer_ = (peer_one *)value_peer;
+			if(peer_ != peer){//todo 多对多，暂时只支持1对1的
+				json_t *reply = janus_create_message("event", 0, NULL);
+				
+				json_t *jsep_send = json_object();
+				//json_object_set_new(reply, "plugindata", json_integer(session_id));
+				//json_object_set_new(jsep_send, "sdp", sdp);
+				//json_object_set_new(jsep_send, "type", "offer");
+				json_object_set_new(reply, "jsep", jsep);
+				//json_object_set_new(reply, "data", data);
+				int ret = janus_process_success(peer_->request, reply);
+			}
+		}
+	} 
+	else if(!strcasecmp(command_text, "trickle")){
+		
+	} 
+	
+}
+#if 0
 void p2p_proces(janus_request *request, json_t *root) {
 		init();
 		json_t *transaction = json_object_get(root, "transaction");
@@ -206,8 +262,9 @@ void p2p_proces(janus_request *request, json_t *root) {
 		/* Send the success reply */
 		int ret = janus_process_success(request, reply);
 }
+#endif
 
-void p2p_free(guint64 session_id){
+room_one* find_room(guint64 session_id){
 	GHashTableIter iter;
 	gpointer value;
 	
@@ -215,29 +272,41 @@ void p2p_free(guint64 session_id){
 	while(g_hash_table_iter_next(&iter, NULL, &value)) {
 		room_one *room = (room_one *) value;
 		peer_one* peer = g_hash_table_lookup(room->peers, session_id);
-	
 		if(peer){
-			GHashTableIter iter_peer;
-			gpointer value_peer;
-			
-			g_hash_table_iter_init(iter_peer, room->peers);
-			while(g_hash_table_iter_next(&iter_peer, NULL, &value_peer)){
-				peer_one* peer_ = (peer_one *)value_peer;
-				if(peer_ != peer){//todo 多对多
-					json_t *reply = janus_create_message("hangup", 0, NULL);
-					//json_object_set_new(reply, "data", data);
-					int ret = janus_process_success(peer_->request, reply);
-				}
+			return room;
+		}
+	}
+	return NULL;
+}
+
+void p2p_free(guint64 session_id){
+	room_one* room = find_room(session_id);
+	if(room){
+		GHashTableIter iter_peer;
+		gpointer value_peer;
+	
+		peer_one* peer = g_hash_table_lookup(room->peers, session_id);
+		
+		g_hash_table_iter_init(iter_peer, room->peers);
+		while(g_hash_table_iter_next(&iter_peer, NULL, &value_peer)){
+			peer_one* peer_ = (peer_one *)value_peer;
+			if(peer_ != peer){//todo 多对多
+				json_t *reply = janus_create_message("hangup", 0, NULL);
+				//json_object_set_new(reply, "data", data);
+				int ret = janus_process_success(peer_->request, reply);
 			}
+		}
+		g_hash_table_remove(room->peers, &session_id);
+		if(!g_hash_table_size(room->peers)){
+			g_hash_table_remove(p2p_rooms, room->room_id);
 		}
 	}
 }
 
 int isp2p(json_t *root){
 	json_t *p2p = json_object_get(root, "p2p");
-	int  = 0;
-	//const gchar *transaction_text = json_string_value(transaction);
-	if(p2p) {
+	const gchar *p2p_text = json_string_value(p2p);
+	if(p2p && !strcasecmp(p2p_text, "yes")) {
 		return 1;
 	}
 	return 0;
