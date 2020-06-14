@@ -149,20 +149,24 @@ int p2p_message_process(janus_request *request, json_t *root){
 			janus_process_error(request, 0, transaction_text, 1000, "no room in json");
 			return -1;
 		}
+		
+		
 		const char *r = json_string_value(room);
 		
 		peer_one* peer;
 		room_one *room_ins = g_hash_table_lookup(p2p_rooms, r);
 		
 		if(room_ins){//
-			if(sid){
+			if(0/*sid*/)
+			{
 				peer = g_hash_table_lookup(room_ins->peers, sid);
 				if(peer){
 					janus_process_error(request, sid, transaction_text, 1000, "session_id already ok");
 					return -1;
 				}
 			}
-			else{
+			else
+			{
 				peer = new_peer(request, root);
 				peer->room_id = g_strdup(r);
 				g_hash_table_insert(room_ins->peers, janus_uint64_dup(sid), peer);
@@ -187,18 +191,20 @@ int p2p_message_process(janus_request *request, json_t *root){
 						int ret = janus_process_success(peer_->request, reply);
 					}
 				}
-				json_t *reply = janus_create_message("_peers", 0, NULL);
+				json_t *reply = janus_create_message("_peers", peer->session->session_id, NULL);
 				json_t *data = json_object();
 				json_object_set_new(data, "connections", new_peer);
+				//json_object_set_new(data, "id", new_peer);
 				json_object_set_new(reply, "data", data);
 				//json_object_set_new(reply, "data", data);
 				int ret = janus_process_success(peer->request, reply);
 			}
 		}
 		else{
+			JANUS_LOG(LOG_ERR, "new room, new peer.\n");
 			room_ins = new_room(request, root, r);
 			peer = new_peer(request, root);
-			peer->root_id = g_strdup(r);
+			peer->room_id = g_strdup(r);
 			g_hash_table_insert(room_ins->peers, janus_uint64_dup(sid), peer);
 			g_hash_table_insert(p2p_rooms, g_strdup(r), room_ins);
 		}
@@ -223,7 +229,7 @@ int p2p_message_process(janus_request *request, json_t *root){
 		g_hash_table_iter_init(iter_peer, room->peers);
 		while(g_hash_table_iter_next(&iter_peer, NULL, &value_peer)){
 			peer_one* peer_ = (peer_one *)value_peer;
-			if(peer_ != peer){//todo 多对多，暂时只支持1对1的
+			if(peer_ != peer){//todo 多对多，暂时只支持1对1
 				json_t *reply = janus_create_message("event", 0, NULL);
 				json_object_set_new(reply, "jsep", jsep);
 				//json_object_set_new(reply, "data", data);
