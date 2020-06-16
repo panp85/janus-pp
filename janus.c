@@ -200,14 +200,15 @@ int p2p_message_process(janus_request *request, json_t *root){
 						int ret = janus_process_success(peer_->request, reply);
 					}
 				}
+				json_t *handleid = json_object_get(root, "id");
+				const guint64 handle_id = json_integer_value(handleid);
+				
 				json_t *reply = janus_create_message("success", peer->session->session_id, NULL);
 				json_object_set_new(reply, "relay", "attach");
-				//json_object_set_new(reply, "_peers", new_peer);
 				json_t *data = json_object();
 				json_object_set_new(reply, "connections", json_string(new_peer));
-				//json_object_set_new(data, "id", new_peer);
+				json_object_set_new(data, "id", handle_id);
 				json_object_set_new(reply, "data", data);
-				//json_object_set_new(reply, "data", data);
 				int ret = janus_process_success(peer->request, reply);
 			}
 		}
@@ -231,7 +232,7 @@ int p2p_message_process(janus_request *request, json_t *root){
 		//json_t *sdp = json_object_get(root, "sdp");
 	 	
 		room_one* room = find_room(sid);
-		peer_one* peer = g_hash_table_lookup(room->peers, session_id);
+		peer_one* peer = g_hash_table_lookup(room->peers, &session_id);
 		json_t *socketId = json_object_get(root, "socketId");
 		const guint64 peer_id = json_integer_value(socketId);
 
@@ -250,7 +251,20 @@ int p2p_message_process(janus_request *request, json_t *root){
 		}
 	} 
 	else if(!strcasecmp(command_text, "trickle")){
-		
+		JANUS_LOG(LOG_ERR, "trickle relay\n");
+		json_t *jsep = son_object_get(root, "data");
+		//json_t *session_id = son_object_get(root, "session_id");
+		room_one* room = find_room(sid);
+		peer_one* peer = g_hash_table_lookup(room->peers, &session_id);
+
+		json_t *relay = janus_create_message("event", 0, NULL);
+		json_object_set_new(relay, "data", jsep);
+		/*
+		bundle->setString("sdpMid", mid);
+	    bundle->setInt("sdpMLineIndex", index);
+	    bundle->setString("candidate", sdp);
+	    bundle->setInt("handleId", id);
+	    */
 	} 
 	return 0;
 }
@@ -1393,6 +1407,7 @@ int janus_process_incoming_request(janus_request *request) {
 		}
 		
 		if(isp2p(root)){
+			json_object_set_new(root, "id", json_integer(handle_id));
 			p2p_message_process(request, root);
 		}
 		else{
