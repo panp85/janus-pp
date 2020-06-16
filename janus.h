@@ -284,3 +284,38 @@ gint janus_is_stopping(void);
 gboolean janus_is_webrtc_encryption_enabled(void);
 
 #endif
+
+#ifndef P2P
+#define P2P
+
+
+typedef struct room_one{
+	char *room_id;
+//	guint64 key;
+	int peer_num;
+	GHashTable *peers;
+	
+} room_one;
+
+typedef struct peer_one{
+	janus_session *session;
+	janus_request *request;
+	char *room_id;
+	
+} peer_one;
+
+void free_room(gpointer data);
+void free_peer(gpointer data);
+void init(void);
+
+int p2p_message_process(janus_request *request, json_t *root);
+void p2p_free(guint64 session_id);
+int isp2p(json_t *root);
+room_one* find_room(guint64 session_id);
+json_t *janus_create_message(const char *status, uint64_t session_id, const char *transaction);
+peer_one* new_peer(janus_request *request, json_t *root);
+room_one* new_room(janus_request *request, json_t *root, const char *room_id);
+
+
+#endif
+
