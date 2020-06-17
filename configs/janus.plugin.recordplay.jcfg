@@ -1,0 +1,7 @@
+# path = where to place recordings in the file system
+# events = true|false, whether events should be sent to event handlers
+
+general: {
+	path = "/home/panpan/janus/janus-gateway-0.8.0/janus-test1/share/janus/recordings"
+	#events = false
+}
