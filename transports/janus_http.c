@@ -1033,6 +1033,8 @@ int janus_http_send_message(janus_transport_session *transport, void *request_id
 			json_decref(message);
 			return -1;
 		}
+		//char *payload_text = json_dumps(message, json_format);
+		//JANUS_LOG(LOG_ERR, "g_async_queue_push session->events: %s.\n", payload_text);
 		g_async_queue_push(session->events, message);
 		janus_mutex_unlock(&sessions_mutex);
 	} else {
@@ -1043,7 +1045,7 @@ int janus_http_send_message(janus_transport_session *transport, void *request_id
 		}
 		/* This is a response, we need a valid transport instance */
 		if(transport == NULL || transport->transport_p == NULL) {
-			JANUS_LOG(LOG_ERR, "Invalid HTTP instance...\n");
+			JANUS_LOG(LOG_ERR, "Invalid HTTP instance..., transport: %s.\n", transport?"yes":"no");
 			json_decref(message);
 			return -1;
 		}
@@ -1829,14 +1831,14 @@ int janus_http_notifier(janus_transport_session *ts, janus_http_session *session
 		return MHD_NO;
 	if(max_events < 1)
 		max_events = 1;
-	JANUS_LOG(LOG_DBG, "... handling long poll...\n");
+	JANUS_LOG(LOG_DBG, "... handling long poll...%"SCNu64"\n", session->session_id);
 	int ret = MHD_NO;
 	gint64 start = janus_get_monotonic_time();
 	gint64 end = 0;
 	json_t *event = NULL, *list = NULL;
 	gboolean found = FALSE;
 	/* We have a timeout for the long poll: 30 seconds */
-	while(end-start < 30*G_USEC_PER_SEC) {
+	while(end-start < 2*G_USEC_PER_SEC) {
 		if(g_atomic_int_get(&session->destroyed))
 			break;
 		event = g_async_queue_try_pop(session->events);
@@ -1865,6 +1867,7 @@ int janus_http_notifier(janus_transport_session *ts, janus_http_session *session
 		}
 		/* Sleep 100ms */
 		g_usleep(100000);
+		//JANUS_LOG(LOG_DBG, "next 100ms, %"SCNu64"\n", session->session_id);
 		end = janus_get_monotonic_time();
 	}
 	if((max_events == 1 && event == NULL) || (max_events > 1 && list == NULL))
@@ -1884,6 +1887,15 @@ int janus_http_notifier(janus_transport_session *ts, janus_http_session *session
 			json_array_append_new(list, event);
 		}
 		/* FIXME Improve the Janus protocol keep-alive mechanism in JavaScript */
+	}
+	else
+	{
+		JANUS_LOG(LOG_VERB, "fount, %"SCNu64", max_events: %d\n", session->session_id, max_events);
+		if(event){
+			json_t *janus = json_object_get(event, "janus");
+			const char* janus_str = json_string_value(janus);
+			JANUS_LOG(LOG_VERB, "janus: %s\n", janus_str);
+		}
 	}
 	char *payload_text = json_dumps(max_events == 1 ? event : list, json_format);
 	json_decref(max_events == 1 ? event : list);
