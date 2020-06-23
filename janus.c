@@ -130,39 +130,6 @@ void push_resp(int64_t session_id, json_t *reply_response){
 	janus_mutex_unlock(&resp_mutex);
 }
 
-
-#if 0
-room_one *room_create(guint64 session_id) {
-	janus_session *session = NULL;
-	if(session_id == 0) {
-		while(session_id == 0) {
-			session_id = janus_random_uint64();
-			session = janus_session_find(session_id);
-			if(session != NULL) {
-				/* Session ID already taken, try another one */
-				janus_refcount_decrease(&session->ref);
-				session_id = 0;
-			}
-		}
-	}
-	session = (janus_session *)g_malloc(sizeof(janus_session));
-	JANUS_LOG(LOG_INFO, "Creating new session: %"SCNu64"; %p\n", session_id, session);
-	session->session_id = session_id;
-	janus_refcount_init(&session->ref, janus_session_free);
-	session->source = NULL;
-	g_atomic_int_set(&session->destroyed, 0);
-	g_atomic_int_set(&session->timeout, 0);
-	g_atomic_int_set(&session->transport_gone, 0);
-	session->last_activity = janus_get_monotonic_time();
-	session->ice_handles = NULL;
-	janus_mutex_init(&session->mutex);
-	janus_mutex_lock(&sessions_mutex);
-	g_hash_table_insert(sessions, janus_uint64_dup(session->session_id), session);
-	janus_mutex_unlock(&sessions_mutex);
-	return session;
-}
-#endif
-
 peer_one* new_peer(janus_request *request, json_t *root){
 	
 	json_t *session_id = json_object_get(root, "session_id");
@@ -238,16 +205,7 @@ int p2p_message_process(janus_request *request, json_t *root){
 		
 		if(room_ins){//
 			JANUS_LOG(LOG_ERR, "has a room.\n");
-			if(0/*sid*/)
-			{
-				peer = g_hash_table_lookup(room_ins->peers, &sid);
-				if(peer){
-					janus_process_error(request, sid, transaction_text, 1000, "session_id already ok");
-					janus_mutex_unlock(&rooms_mutex);
-					return -1;
-				}
-			}
-			else
+			
 			{
 				peer = new_peer(request, root);
 				peer->room_id = g_strdup(r);
@@ -365,9 +323,10 @@ int p2p_message_process(janus_request *request, json_t *root){
 				JANUS_LOG(LOG_ERR, "one peer, send jsep.\n");
 				json_t *reply = janus_create_message("event", 0, NULL);
 				json_object_set_new(reply, "jsep", json_deep_copy(jsep));
-				
+				json_object_set_new(reply, "peer_id", json_integer(peer->session->session_id));
 				//json_object_set_new(reply, "data", data);
 				push_resp(peer_id, reply);
+				break;
 				//g_async_queue_push(reply_responses, reply);
 			}
 		}

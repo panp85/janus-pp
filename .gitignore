@@ -1,3 +1,6 @@
+*.log
+*.pp
+core
 cmdline.c
 cmdline.h
 version.c

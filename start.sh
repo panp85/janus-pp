@@ -41,3 +41,5 @@
   138  cd janus/janus-gateway-0.8.0/
   142  history |grep janus
   143  history |grep janus > start.sh
+
+  mv -f ./log.pp ./pp.log && sudo ./janus-test1/bin/janus -C /home/panpan/player/janus/janus-gateway-0.8.0/janus-test1/etc/janus/janus.jcfg -d 7 --log-file=./log.pp -D
