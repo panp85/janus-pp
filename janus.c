@@ -252,8 +252,10 @@ int p2p_message_process(janus_request *request, json_t *root){
 						json_object_set_new(data, "peer_id", json_integer(peer->session->session_id));
 						json_object_set_new(reply_response, "data", data);
 						JANUS_LOG(LOG_ERR, "send to %"SCNu64", with peer_id: %"SCNu64".\n", peer_->session->session_id, peer->session->session_id);
-						push_resp(peer_->session->session_id, reply_response);
-						
+						//push_resp(peer_->session->session_id, reply_response);
+						janus_session *session = janus_session_find(peer_->session->session_id);
+						json_object_set_new(reply_response, "session_id", json_integer(peer_->session->session_id));
+						janus_session_notify_event(session, reply_response);
 					}
 					JANUS_LOG(LOG_ERR, "redo peer\n");
 				}
@@ -264,7 +266,7 @@ int p2p_message_process(janus_request *request, json_t *root){
 				JANUS_LOG(LOG_ERR, "connections: %s.\n", new_peer);
 				
 				json_t *reply = janus_create_message("success", peer->session->session_id, NULL);
-				json_object_set_new(reply, "relay", json_string("attach"));
+				json_object_set_new(reply, "reply", json_string("attach"));
 				json_t *data = json_object();
 				json_object_set_new(reply, "connections", json_string(new_peer));
 				json_object_set_new(data, "id", json_integer(handle_id));
@@ -287,7 +289,7 @@ int p2p_message_process(janus_request *request, json_t *root){
 			//janus_mutex_unlock(&peers_mutex);
 			
 			json_t *reply = janus_create_message("success", peer->session->session_id, NULL);
-			json_object_set_new(reply, "relay", json_string("attach"));
+			json_object_set_new(reply, "reply", json_string("attach"));
 			json_t *data = json_object();
 			//json_object_set_new(reply, "connections", json_string(new_peer));
 			json_object_set_new(data, "id", json_integer(handle_id));
@@ -307,7 +309,7 @@ int p2p_message_process(janus_request *request, json_t *root){
 	 	JANUS_LOG(LOG_ERR, "jsep.\n");
 		room_one* room = find_room(sid);
 		//janus_mutex_lock(&peers_mutex);
-		peer_one* peer = g_hash_table_lookup(room->peers, &session_id);
+		peer_one* peer = g_hash_table_lookup(room->peers, &sid);
 		
 		json_t *peerId = json_object_get(root, "peer_id");
 		const guint64 peer_id = json_integer_value(peerId);
@@ -325,7 +327,10 @@ int p2p_message_process(janus_request *request, json_t *root){
 				json_object_set_new(reply, "jsep", json_deep_copy(jsep));
 				json_object_set_new(reply, "peer_id", json_integer(peer->session->session_id));
 				//json_object_set_new(reply, "data", data);
-				push_resp(peer_id, reply);
+				//push_resp(peer_id, reply);
+				janus_session *session = janus_session_find(peer_->session->session_id);
+				json_object_set_new(reply, "session_id", json_integer(peer_->session->session_id));
+				janus_session_notify_event(session, reply);
 				break;
 				//g_async_queue_push(reply_responses, reply);
 			}
@@ -357,7 +362,10 @@ int p2p_message_process(janus_request *request, json_t *root){
 				//json_object_set_new(reply, "plugindata", plugin_data);
 				json_object_set_new(reply, "data", json_deep_copy(candidate));
 				
-		push_resp(peer_id, reply);
+		//push_resp(peer_id, reply);
+		janus_session *session = janus_session_find(peer_->session->session_id);
+		json_object_set_new(reply, "session_id", json_integer(peer_->session->session_id));
+		janus_session_notify_event(session, reply);
 
 		json_t* reply_response = janus_create_message("success", 0, NULL);
 		//int ret = janus_process_success(peer_->request, reply);
@@ -1411,7 +1419,9 @@ int janus_process_incoming_request(janus_request *request) {
 	if(!strcasecmp(message_text, "keepalive")) {
 		/* Just a keep-alive message, reply with an ack */
 		JANUS_LOG(LOG_VERB, "Got a keep-alive on session %"SCNu64"\n", session_id);
+
 		json_t *reply;
+/*	
 		if(resp_write_index > 0){
 			struct response_async* resp = find_response(session_id);
 			if(!resp){
@@ -1428,7 +1438,9 @@ int janus_process_incoming_request(janus_request *request) {
 				json_object_set_new(reply, "session_id", json_integer(session_id));
 			}
 		}
-		else{
+		else
+*/
+		{
 			reply = janus_create_message("ack", session_id, transaction_text);
 		}
 		/* Send the success reply */

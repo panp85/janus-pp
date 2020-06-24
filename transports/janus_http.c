@@ -1838,7 +1838,7 @@ int janus_http_notifier(janus_transport_session *ts, janus_http_session *session
 	json_t *event = NULL, *list = NULL;
 	gboolean found = FALSE;
 	/* We have a timeout for the long poll: 30 seconds */
-	while(end-start < 2*G_USEC_PER_SEC) {
+	while(end-start < 30*G_USEC_PER_SEC) {
 		if(g_atomic_int_get(&session->destroyed))
 			break;
 		event = g_async_queue_try_pop(session->events);
