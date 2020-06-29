@@ -298,7 +298,8 @@ typedef struct room_one{
 } room_one;
 
 typedef struct peer_one{
-	janus_session *session;
+	//janus_session *session;
+	guint64 session_id;
 	//janus_request *request;
 	char *room_id;
 	
