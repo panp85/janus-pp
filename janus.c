@@ -353,7 +353,7 @@ int p2p_message_process(janus_request *request, json_t *root){
 		//janus_mutex_lock(&peers_mutex);
 		peer_one* peer_ = g_hash_table_lookup(room->peers, &peer_id);
 		//janus_mutex_unlock(&peers_mutex);
-
+		if(peer_){
 		json_t *reply = janus_create_message("trickle", 0, NULL);
 		//json_object_set_new(reply, "data", json_deep_copy(candidate));
 		json_object_set_new(reply, "peer_id", json_integer(sid));
@@ -368,7 +368,7 @@ int p2p_message_process(janus_request *request, json_t *root){
 		janus_session *session = janus_session_find(peer_->session_id);
 		json_object_set_new(reply, "session_id", json_integer(peer_->session_id));
 		janus_session_notify_event(session, reply);
-
+		}
 		json_t* reply_response = janus_create_message("success", 0, NULL);
 		//int ret = janus_process_success(peer_->request, reply);
 		int ret = janus_process_success(request, reply_response);
